@@ -2,143 +2,105 @@
 
 ## Overview
 
-This repository is a portfolio-oriented case study for my work on the Sosim server codebase.
+This repository is a portfolio-oriented case study for my work on the Sosim server backend.
 
-The project history split into two tracks:
-- an older codebase now represented locally by `deprecated-server`
-- a newer organization repository represented by `so-sim/server`
+The backend work had to be split across:
+- an active organization repository
+- a deprecated legacy repository
+- an independent portfolio repository for architecture notes and evidence
 
-Because the repository lineage changed during later development, I organized my work around three goals:
-- continue contributing to the active organization codebase
-- preserve and understand the legacy implementation path
-- document technical decisions in a form that is readable as a portfolio
+That separation was not just administrative. It affected contribution flow, branch strategy, PR targets, and how JWT/Redis work could be safely ported.
 
-## My Focus Area
+## What This Repository Covers
 
-The main technical theme of this case study is JWT and Redis session handling.
+This case study focuses on three related themes:
+- repository lineage recovery after an upstream split
+- JWT/Redis refresh-token hardening
+- turning that engineering work into reviewable contributions and portfolio evidence
 
-I focused on:
-- refresh token storage redesign
-- JWT cookie bug fixes
-- active vs legacy server comparison
-- contribution workflow recovery after repository history split
+## Core Story
 
-## Problem Background
+The original backend work no longer lived in one clean repository line.
 
-The original server and the newer organization server do not share the same structure anymore.
+As the codebase diverged, I had to solve two problems in parallel:
+- keep contributing to the active server in a clean fork relationship
+- preserve and analyze the older implementation without mixing histories
 
-This created practical issues:
-- remote relationships became confusing
-- active contribution targets were unclear
-- old implementation details still mattered for debugging and comparison
-- portfolio presentation became difficult because the code history was split across repositories
+That led to a three-repository strategy:
+- active contribution fork for `so-sim/server`
+- legacy fork for `so-sim/Deprecated_server`
+- independent portfolio repository for writeups and evidence
 
-## What I Changed
+## Main Technical Contribution
 
-### 1. Refresh token storage redesign
+The most substantial implementation work in this case study is the JWT/Redis refresh migration ported onto the active branch.
 
-I changed refresh token storage from a single-token mapping to a per-user hash structure.
+Highlights:
+- refresh token storage redesigned to a per-user Redis hash with device separation
+- refresh validation changed to use both token content and device context
+- refresh and logout flows updated to handle server-side invalidation correctly
+- cookie handling improved to include a device identifier and null-safe extraction
+- verification helpers and migration notes added for reviewability
 
-Before:
-- key: refresh token string
-- value: user id
-- no meaningful device separation
-- no clean multi-device support
+## Why This Work Mattered
 
-After:
-- key: `refresh:{userId}`
-- field: `deviceId`
-- value: refresh token
-- TTL: 14 days
+The earlier refresh flow was workable for a simple session model, but it became weak under real session-management needs:
+- multiple devices per user
+- selective logout
+- safer server-side invalidation
+- clearer refresh-token inspection and debugging
 
-This gave the server a safer and more explicit base for multi-device session management.
+The active branch already had a different structure from the older code line, so the job was not to transplant files mechanically. The job was to port the stronger ideas into the active repository structure without regressing its conventions.
 
-### 2. JWT cookie bug fixes
+## Reading Guide
 
-I fixed three separate issues in the cookie-based refresh flow:
-- Set-Cookie parsing logic
-- refresh cookie max-age mismatch
-- refresh endpoint mismatch between frontend and backend
+If you want the short version:
 
-These bugs were small individually, but together they caused unstable token refresh behavior.
+1. Start here in `README.md`
+2. Read [docs/repo-lineage.md](./docs/repo-lineage.md)
+3. Read [docs/jwt-redis-hardening.md](./docs/jwt-redis-hardening.md)
+4. Check [docs/pr-index.md](./docs/pr-index.md)
 
-### 3. Active vs legacy repository analysis
+## Document Index
 
-I compared:
-- `server_ver2`
-- `deprecated-server`
-- the downloaded phase-2 server from `so-sim/server`
+- [docs/repo-lineage.md](./docs/repo-lineage.md)
+  Explains how the active repo, deprecated repo, and portfolio repo were separated and why that was necessary.
 
-The result was clear:
-- `server_ver2` still follows the legacy architecture more closely
-- the active organization repo uses a more reorganized module layout
-- JWT and response-code contracts diverged enough that direct patch copying is unsafe
+- [docs/jwt-redis-hardening.md](./docs/jwt-redis-hardening.md)
+  Describes the JWT/Redis migration problem, the final design, the reviewable commit split, and remaining improvement opportunities.
 
-## Key Technical Lessons
+- [docs/pr-index.md](./docs/pr-index.md)
+  Tracks contribution units, current PR-ready work, and review status.
+
+## Concrete Evidence
+
+Current active-branch contribution units:
+- [`cf67574`](https://github.com/jean202/so-sim-server/commit/cf67574) `refactor: port multi-device JWT refresh flow to active branch`
+- [`bc2af17`](https://github.com/jean202/so-sim-server/commit/bc2af17) `docs: add verification helpers for JWT refresh migration`
+
+Validation already completed:
+- `bash ./gradlew compileJava`
+- `bash ./gradlew test`
+
+## Key Lessons
 
 ### Repository history matters
 
-A remote URL change is not the same thing as a clean codebase migration.
-
-When repository ownership or organization changes mid-project, contribution strategy needs to be reset deliberately:
-- active upstream
-- legacy upstream
-- personal fork
-- portfolio repository
+Changing a remote target is not the same thing as finishing a codebase migration. Repository lineage and code architecture can diverge for a long time.
 
 ### Session design matters
 
-JWT alone is not enough for stable sign-in behavior.
+JWT alone does not solve session management. Redis storage shape, cookie handling, device identity, and invalidation rules all affect the real security and operability of auth flows.
 
-Refresh token storage strategy affects:
-- logout behavior
-- reissue behavior
-- multi-device support
-- incident response when a token is stolen or replayed
+### Reviewability matters
 
-### API contracts must be verified end-to-end
+A technically correct migration is easier to land when it is split into commits that reviewers can reason about:
+- core auth/storage change
+- verification and documentation follow-up
 
-A frontend that expects one refresh failure code and a backend that emits another will fail even when both sides look individually correct.
+## Recommended Interview Framing
 
-## Representative Contribution Themes
-
-- Redis refresh token structure redesign
-- multi-device refresh token support
-- refresh-cookie behavior correction
-- active/legacy server diff analysis
-- contribution workflow reconstruction after repository split
-
-## Suggested Evidence To Link
-
-Add these after pushing the final work:
-- PR links to `so-sim/server`
-- PR links to any legacy backport work
-- commit links from `jean202/sosim-server`
-- screenshots or curl traces of refresh/login/logout behavior
-- architecture notes or diagrams
-
-## How To Present This In Interviews
-
-Recommended framing:
-
-1. The project had a broken repository lineage between legacy and active codebases.
-2. I separated active contribution, legacy comparison, and portfolio documentation.
-3. I improved JWT and Redis session handling instead of only patching symptoms.
-4. I documented the migration and contract risks so future work could move faster.
-
-## Repository Plan
-
-This portfolio repository should contain:
-- this README
-- architecture comparison notes
-- before/after diagrams
-- PR index
-- verification notes
-- lessons learned
-
-## Next Additions
-
-- `docs/repo-lineage.md`
-- `docs/jwt-redis-hardening.md`
-- `docs/frontend-backend-contract-checklist.md`
-- `docs/pr-index.md`
+1. The project had an active backend line and a deprecated backend line, and they could no longer be treated as the same repository story.
+2. I separated active contribution, legacy comparison, and portfolio documentation into distinct repositories.
+3. I ported a stronger JWT/Redis refresh design into the active branch without copying the older branch blindly.
+4. I left behind documents and PR-ready evidence so the work was easy to review and explain.
